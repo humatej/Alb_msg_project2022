@@ -1,6 +1,7 @@
-#include "painlessMesh.h"
+#include <Arduino.h>
+#include <painlessMesh.h>
 #include <Adafruit_MPU6050.h>
-#include "SoftwareSerial.h"
+#include <SoftwareSerial.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <Wire.h>
@@ -30,9 +31,7 @@ bool isFallen();
 double absolute(float);
 float batPer();
 void sendData(String data);
-void dly(int time);
-void sendData(String data);
-
+//painless methods
 void sendMessage() ; // Prototype so PlatformIO doesn't complain
 
 Task taskSendMessage( TASK_SECOND * 60 , TASK_FOREVER, &sendMessage );
@@ -89,11 +88,14 @@ void setup() {
     mpu.setInterruptPinPolarity(true);
     mpu.setMotionInterrupt(true);
   }
-  dly(100);
+  gsmSerial.println(F("AT"));
+  updateSerial();
   gsmSerial.print(F("AT+CREG?\r\n")); //Check whether it has registered in the network
-  dly(200);
+  delay(200);
+  updateSerial();
   gsmSerial.print(F("AT+CGATT=1\r\n")); //Attach GPRS (data comunications)
-  dly(500);
+  updateSerial();
+  delay(500);
 }
 
 void loop() {
@@ -121,42 +123,27 @@ double absolute(float n){
 float batPer(){
   return 100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8;
 }
-void dly(int time){
-  unsigned long int start = millis();
-  while(millis()- start < time + 10){
-  } 
-}
 void sendData(String data){
   gsmSerial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
-  Serial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
-  dly(2000);
+  delay(2000);
   gsmSerial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
-  Serial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
-  dly(2000);
+  delay(2000);
   gsmSerial.println(F("AT+SAPBR=1,1"));
-  Serial.println(F("AT+SAPBR=1,1"));
-  dly(2000);
+  delay(2000);
   gsmSerial.println(F("AT+SAPBR=2,1"));
-  Serial.println(F("AT+SAPBR=2,1"));
-  dly(2000);
+  delay(2000);
   gsmSerial.println(F("AT+HTTPINIT"));
-  Serial.println(F("AT+HTTPINIT"));
-  dly(2000);
+  delay(2000);
   gsmSerial.println(F("AT+HTTPPARA=\"CID\",1"));
-  Serial.println(F("AT+HTTPPARA=\"CID\",1"));
-  dly(3000);
+  delay(3000);
   gsmSerial.print(F("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"));
-  Serial.println(F("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"));
   gsmSerial.print(data);
   gsmSerial.print(F("\r\n"));
-  dly(2000);
+  delay(2000);
   gsmSerial.print(F("AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"));
-  Serial.print(F("AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"));
-  dly(5000);
-  gsmSerial.print(F("AT+HTTPACTION=0"));
-  Serial.println(F("AT+HTTPACTION=0"));
-  dly(6000);
-  gsmSerial.print(F("AT+HTTPTERM"));
-  Serial.println(F("AT+HTTPTERM"));
-  dly(2000);
+  delay(5000);
+  gsmSerial.println(F("AT+HTTPACTION=0"));
+  delay(6000);
+  gsmSerial.println(F("AT+HTTPTERM"));
+  delay(2000);
 }
