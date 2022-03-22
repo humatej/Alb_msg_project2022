@@ -1,4 +1,4 @@
-#Albert Message final school project
+# Albert Message final school project #
 
 Author: Matej Hušla 2022
 
