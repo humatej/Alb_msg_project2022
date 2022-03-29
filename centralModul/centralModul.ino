@@ -6,8 +6,8 @@
 #include <DHT.h>
 #include <Wire.h>
 
-#define   MESH_PREFIX     "albMsg"
-#define   MESH_PASSWORD   "h1kKffg4ghPds"
+#define   MESH_PREFIX     "MESH SSD"
+#define   MESH_PASSWORD   "MESH PASSWORD"
 #define   MESH_PORT       5555
 
 Scheduler userScheduler; // to control your personal task
