@@ -10,3 +10,5 @@ All library I use:
  - DHT senzor library: https://github.com/adafruit/DHT-sensor-library
  - Adafruit_MPU6050: https://github.com/adafruit/Adafruit_MPU6050
  - EspSoftwareSerial: https://github.com/plerup/espsoftwareserial
+
+Actual version: alpha
