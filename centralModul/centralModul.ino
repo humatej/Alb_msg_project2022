@@ -12,6 +12,8 @@
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
+// temporary data save
+String data = {"","","","","","","","","",""};
 
 SoftwareSerial gsmSerial(13, 15);
 
@@ -25,26 +27,82 @@ DHT dht(DHTPIN, DHTTYPE);
 const String modul_num = "MG";
 // User stub
 Adafruit_MPU6050 mpu;
-bool mpuError = false;
 //my methods
 bool isFallen();
 double absolute(float);
 float batPer();
-void sendData(String data);
+void sendData(String);
+int nodeIndex(String);
 //painless methods
 void sendMessage() ; // Prototype so PlatformIO doesn't complain
 
 Task taskSendMessage( TASK_SECOND * 60 , TASK_FOREVER, &sendMessage );
+Task tsd(TASK_SECOND * 120, TASK_FOREVER, &sendData);
+
+void sendData(){
+  gsmSerial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
+  tsd.setCallback(&sendData1);
+  tsd.delay(2000);
+}
+void senData1(){
+  gsmSerial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
+  tsd.setCallback(&sendData2);
+  tsd.delay(2000);
+}
+void senData2(){
+  gsmSerial.println(F("AT+SAPBR=1,1"));
+  tsd.setCallback(&sendData3);
+  tsd.delay(2000);
+}
+void senData3(){
+  gsmSerial.println(F("AT+SAPBR=2,1"));
+  tsd.setCallback(&sendData4);
+  tsd.delay(2000);
+}
+void senData4(){
+  gsmSerial.println(F("AT+HTTPINIT"));
+  tsd.setCallback(&sendData5);
+  tsd.delay(2000);
+}
+void senData5(){
+  gsmSerial.println(F("AT+HTTPPARA=\"CID\",1"));
+  tsd.setCallback(&sendData6);
+  tsd.delay(3000);
+}
+void senData6(String &data){
+  gsmSerial.print(F("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"));
+  gsmSerial.print(data);
+  gsmSerial.print(F("\r\n"));
+  tsd.setCallback(&sendData7);
+  tsd.delay(2000);
+}
+void senData7(){
+  gsmSerial.print(F("AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"));
+  tsd.setCallback(&sendData8);
+  tsd.delay(5000);
+}
+void senData8(){
+  gsmSerial.println(F("AT+HTTPACTION=0"));
+  tsd.setCallback(&sendData9);
+  tsd.delay(6000);
+}
+void senData9(){
+  gsmSerial.println(F("AT+HTTPTERM"));
+  tsd.setCallback(&sendData);
+  tsd.delay(2000);
+}
 
 void sendMessage() {
-  mesh.sendBroadcast("OK");
+  //mesh.sendBroadcast("OK");
   taskSendMessage.setInterval( random( TASK_SECOND * 59, TASK_SECOND * 61 ));
 }
 
 // Needed for painless library
 void receivedCallback( uint32_t from, String &msg ) {
   Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
-  sendData(msg);
+  //sendData(msg);
+  unsigned int index = nodeIndex(msg);
+  data[index] = msg;
 }
 
 void newConnectionCallback(uint32_t nodeId) {
@@ -72,14 +130,13 @@ void setup() {
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 
   userScheduler.addTask( taskSendMessage );
+  userScheduler.addTask( tsd );
   taskSendMessage.enable();
+  tsd.enable();
 
  dht.begin();
 
-  if (!mpu.begin()) {
-      mpuError = true;
-  }
-  else{
+  if (mpu.begin()) {
     //setupt motion detection
     mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
     mpu.setMotionDetectionThreshold(1);
@@ -98,6 +155,9 @@ void setup() {
   delay(500);
 }
 
+unsigned long int start = millis();
+const unsigned int deltim = 120000; 
+const unsigned int incomedel = 60000;
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
@@ -123,27 +183,8 @@ double absolute(float n){
 float batPer(){
   return 100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8;
 }
-void sendData(String data){
-  gsmSerial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
-  delay(2000);
-  gsmSerial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
-  delay(2000);
-  gsmSerial.println(F("AT+SAPBR=1,1"));
-  delay(2000);
-  gsmSerial.println(F("AT+SAPBR=2,1"));
-  delay(2000);
-  gsmSerial.println(F("AT+HTTPINIT"));
-  delay(2000);
-  gsmSerial.println(F("AT+HTTPPARA=\"CID\",1"));
-  delay(3000);
-  gsmSerial.print(F("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"));
-  gsmSerial.print(data);
-  gsmSerial.print(F("\r\n"));
-  delay(2000);
-  gsmSerial.print(F("AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"));
-  delay(5000);
-  gsmSerial.println(F("AT+HTTPACTION=0"));
-  delay(6000);
-  gsmSerial.println(F("AT+HTTPTERM"));
-  delay(2000);
+
+
+int nodeIndex(String msg){
+  return toInt(msg[msg.length()-1]);
 }
