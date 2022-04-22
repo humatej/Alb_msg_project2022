@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <painlessMesh.h>
 #include <Adafruit_MPU6050.h>
 #include <SoftwareSerial.h>
@@ -13,7 +12,8 @@
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
 // temporary data save
-String data = {"","","","","","","","","",""};
+unsigned int i = 0;
+String data[] = {"","","","","","","","","",""};
 
 SoftwareSerial gsmSerial(13, 15);
 
@@ -22,6 +22,10 @@ SoftwareSerial gsmSerial(13, 15);
 //-- Input parameters:
 #define DHTPIN 14
 #define DHTTYPE DHT22
+//battery constant
+//#define VMAX
+//#define VMIN
+
 
 DHT dht(DHTPIN, DHTTYPE); 
 const String modul_num = "MG";
@@ -31,70 +35,42 @@ Adafruit_MPU6050 mpu;
 bool isFallen();
 double absolute(float);
 float batPer();
-void sendData(String);
 int nodeIndex(String);
 //painless methods
 void sendMessage() ; // Prototype so PlatformIO doesn't complain
+//void sendAlldata();
+void sendData();
 
 Task taskSendMessage( TASK_SECOND * 60 , TASK_FOREVER, &sendMessage );
-Task tsd(TASK_SECOND * 120, TASK_FOREVER, &sendData);
+//Task sAlldata(TASK_SECOND * 60 , 10, &sendAlldata);
+//Task tsd(TASK_IMMEDIATE, 1, &sendData);
+void updateSerial()
+{
+  delay(500);
+  while (Serial.available()) 
+  {
+    gsmSerial.write(Serial.read());//Forward what Serial received to Software Serial Port
+  }
+  while(gsmSerial.available()) 
+  {
+    Serial.write(gsmSerial.read());//Forward what Software Serial received to Serial Port
+  }
+}
 
-void sendData(){
-  gsmSerial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
-  tsd.setCallback(&sendData1);
-  tsd.delay(2000);
-}
-void senData1(){
-  gsmSerial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
-  tsd.setCallback(&sendData2);
-  tsd.delay(2000);
-}
-void senData2(){
-  gsmSerial.println(F("AT+SAPBR=1,1"));
-  tsd.setCallback(&sendData3);
-  tsd.delay(2000);
-}
-void senData3(){
-  gsmSerial.println(F("AT+SAPBR=2,1"));
-  tsd.setCallback(&sendData4);
-  tsd.delay(2000);
-}
-void senData4(){
-  gsmSerial.println(F("AT+HTTPINIT"));
-  tsd.setCallback(&sendData5);
-  tsd.delay(2000);
-}
-void senData5(){
-  gsmSerial.println(F("AT+HTTPPARA=\"CID\",1"));
-  tsd.setCallback(&sendData6);
-  tsd.delay(3000);
-}
-void senData6(String &data){
-  gsmSerial.print(F("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"));
-  gsmSerial.print(data);
-  gsmSerial.print(F("\r\n"));
-  tsd.setCallback(&sendData7);
-  tsd.delay(2000);
-}
-void senData7(){
-  gsmSerial.print(F("AT+HTTPPARA=\"CONTENT\",\"application/json\"\r\n"));
-  tsd.setCallback(&sendData8);
-  tsd.delay(5000);
-}
-void senData8(){
-  gsmSerial.println(F("AT+HTTPACTION=0"));
-  tsd.setCallback(&sendData9);
-  tsd.delay(6000);
-}
-void senData9(){
-  gsmSerial.println(F("AT+HTTPTERM"));
-  tsd.setCallback(&sendData);
-  tsd.delay(2000);
-}
 
 void sendMessage() {
-  //mesh.sendBroadcast("OK");
-  taskSendMessage.setInterval( random( TASK_SECOND * 59, TASK_SECOND * 61 ));
+  taskSendMessage.delay(2000);
+  i++;
+  if(i > 9){
+    i = 0;
+    taskSendMessage.delay(60000);
+  }
+  if(data[i] != ""){
+    Serial.println(data[i]);
+    sendData();
+    data[i] = "";
+  }
+  
 }
 
 // Needed for painless library
@@ -129,10 +105,12 @@ void setup() {
   mesh.onChangedConnections(&changedConnectionCallback);
   mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
 
-  userScheduler.addTask( taskSendMessage );
-  userScheduler.addTask( tsd );
+  userScheduler.addTask(taskSendMessage);
+  //userScheduler.addTask(tsd);
+  //userScheduler.addTask(sAlldata);
   taskSendMessage.enable();
-  tsd.enable();
+  //tsd.enable();
+  //sAlldata.enable();
 
  dht.begin();
 
@@ -145,19 +123,8 @@ void setup() {
     mpu.setInterruptPinPolarity(true);
     mpu.setMotionInterrupt(true);
   }
-  gsmSerial.println(F("AT"));
-  updateSerial();
-  gsmSerial.print(F("AT+CREG?\r\n")); //Check whether it has registered in the network
-  delay(200);
-  updateSerial();
-  gsmSerial.print(F("AT+CGATT=1\r\n")); //Attach GPRS (data comunications)
-  updateSerial();
-  delay(500);
 }
 
-unsigned long int start = millis();
-const unsigned int deltim = 120000; 
-const unsigned int incomedel = 60000;
 void loop() {
   // it will run the user scheduler as well
   mesh.update();
@@ -186,5 +153,66 @@ float batPer(){
 
 
 int nodeIndex(String msg){
-  return toInt(msg[msg.length()-1]);
+  const int num = msg[msg.length()-1] - 48;
+  return num;
+}
+
+void sendData(){
+  gsmSerial.println(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData2);
+  taskSendMessage.delay(2000);
+}
+void sendData2(){
+  gsmSerial.println(F("AT+SAPBR=3,1,\"APN\",\"internet\""));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData3);
+  taskSendMessage.delay(3000);
+}
+void sendData3(){
+  gsmSerial.println(F("AT+SAPBR=1,1"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData4);
+  taskSendMessage.delay(2000);
+}
+void sendData4(){
+  gsmSerial.println(F("AT+SAPBR=2,1"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData5);
+  taskSendMessage.delay(2000);
+}
+void sendData5(){
+  gsmSerial.println(F("AT+HTTPINIT"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData6);
+  taskSendMessage.delay(2000);
+}
+void sendData6(){
+  gsmSerial.println(F("AT+HTTPPARA=\"CID\",1"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData7);
+  taskSendMessage.delay(3000);
+}
+void sendData7(){
+  gsmSerial.println("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"+data[i]+"\"");
+  updateSerial();
+  taskSendMessage.setCallback(&sendData8);
+  taskSendMessage.delay(5000);
+}
+void sendData8(){
+  gsmSerial.println(F("AT+HTTPPARA=\"CONTENT\",\"application/json\""));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData9);
+  taskSendMessage.delay(4000);
+}
+void sendData9(){
+  gsmSerial.println(F("AT+HTTPACTION=0"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData10);
+  taskSendMessage.delay(6000);
+}
+void sendData10(){
+  gsmSerial.println(F("AT+HTTPREAD"));
+  updateSerial();
+  taskSendMessage.setCallback(&sendData);
 }

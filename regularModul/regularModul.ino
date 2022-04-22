@@ -116,5 +116,5 @@ double absolute(float n){
   } 
 }
 float batPer(){
-  return 100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8;
+  return (100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8);
 }
