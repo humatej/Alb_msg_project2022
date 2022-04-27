@@ -11,4 +11,4 @@ All library I use:
  - Adafruit_MPU6050: https://github.com/adafruit/Adafruit_MPU6050
  - EspSoftwareSerial: https://github.com/plerup/espsoftwareserial
 
-Actual version: 0.9.0 beta
+Actual version: 0.9.8 
