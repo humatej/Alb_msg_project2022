@@ -7,6 +7,7 @@
 #define   MESH_PREFIX     "MESH SSD"
 #define   MESH_PASSWORD   "MESH PASSWORD"
 #define   MESH_PORT       5555
+#define   MESH_SENDING_PERIOD 300000
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
@@ -18,10 +19,12 @@ painlessMesh  mesh;
 #define DHTTYPE DHT22
 
 DHT dht(DHTPIN, DHTTYPE); 
-const String modul_num = "M1";
+const String modul_num = "M2";
 // User stub
 Adafruit_MPU6050 mpu;
-bool mpuError = false;
+//battery constant
+#define VMAX 1024
+#define VMIN 698.18
 
 bool isFallen();
 double absolute(float);
@@ -29,7 +32,7 @@ float batPer();
 
 void sendMessage() ; // Prototype so PlatformIO doesn't complain
 
-Task taskSendMessage( TASK_SECOND * 60 , TASK_FOREVER, &sendMessage );
+Task taskSendMessage( MESH_SENDING_PERIOD , TASK_FOREVER, &sendMessage );
 
 void sendMessage() {
   String msg = "";
@@ -42,7 +45,6 @@ void sendMessage() {
   msg += "&b="+ String(batPer());
   msg += "&m=" + modul_num;
   mesh.sendBroadcast( msg );
-  taskSendMessage.setInterval( random( TASK_SECOND * 59, TASK_SECOND * 61 ));
 }
 
 // Needed for painless library
@@ -79,10 +81,7 @@ void setup() {
 
  dht.begin();
 
-  if (!mpu.begin()) {
-      mpuError = true;
-  }
-  else{
+  if (mpu.begin()) {
     //setupt motion detection
     mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
     mpu.setMotionDetectionThreshold(1);
@@ -116,5 +115,6 @@ double absolute(float n){
   } 
 }
 float batPer(){
-  return (100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8);
+  const float batper = 100 * (analogRead(ANALOG_PIN) - VMIN)/(VMAX - VMIN);
+  return batper;
 }

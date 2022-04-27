@@ -8,6 +8,7 @@
 #define   MESH_PREFIX     "MESH SSD"
 #define   MESH_PASSWORD   "MESH PASSWORD"
 #define   MESH_PORT       5555
+#define   MESH_SENDING_PERIOD 300000
 
 Scheduler userScheduler; // to control your personal task
 painlessMesh  mesh;
@@ -23,12 +24,13 @@ SoftwareSerial gsmSerial(13, 15);
 #define DHTPIN 14
 #define DHTTYPE DHT22
 //battery constant
-//#define VMAX
-//#define VMIN
+#define VMAX 1024
+#define VMIN 698.1
 
 
 DHT dht(DHTPIN, DHTTYPE); 
 const String modul_num = "MG";
+bool is_running = false;
 // User stub
 Adafruit_MPU6050 mpu;
 //my methods
@@ -41,36 +43,37 @@ void sendMessage() ; // Prototype so PlatformIO doesn't complain
 //void sendAlldata();
 void sendData();
 
-Task taskSendMessage( TASK_SECOND * 60 , TASK_FOREVER, &sendMessage );
-//Task sAlldata(TASK_SECOND * 60 , 10, &sendAlldata);
-//Task tsd(TASK_IMMEDIATE, 1, &sendData);
-void updateSerial()
-{
-  delay(500);
-  while (Serial.available()) 
-  {
-    gsmSerial.write(Serial.read());//Forward what Serial received to Software Serial Port
-  }
-  while(gsmSerial.available()) 
-  {
-    Serial.write(gsmSerial.read());//Forward what Software Serial received to Serial Port
-  }
-}
-
+Task taskSendMessage(  100 , TASK_FOREVER, &sendMessage );
+//Task sd(100, TASK_FOREVER, &sendData);
+//Task forik(TASK_IMMEDIATE, 10, &forloop);
 
 void sendMessage() {
-  taskSendMessage.delay(2000);
-  i++;
+  Serial.println(i);
+  if(i == 0){
+    String msg = "";
+    msg += "f=" + String(isFallen());
+    if (!isnan(dht.readTemperature()) && !isnan(dht.readHumidity())){
+      String t = String(dht.readTemperature()), h= String(dht.readHumidity());
+      msg += "&t=" + t.substring(0,4);
+      msg += "&h=" + h.substring(0,4);
+    }
+    msg += "&b="+ String(batPer());
+    msg += "&m=" + modul_num;
+    data[0] = msg;
+  }
   if(i > 9){
-    i = 0;
-    taskSendMessage.delay(60000);
+    i = 1;
+    taskSendMessage.delay(MESH_SENDING_PERIOD);
   }
-  if(data[i] != ""){
-    Serial.println(data[i]);
-    sendData();
-    data[i] = "";
+  else{
+    if(data[i] != ""){
+      sendData();
+    }
+    else{
+      i++;
+    }
   }
-  
+
 }
 
 // Needed for painless library
@@ -148,13 +151,33 @@ double absolute(float n){
   } 
 }
 float batPer(){
-  return 100.0 * (analogRead(ANALOG_PIN)-695,07)/204.8;
+  const float batper = 100 * (analogRead(ANALOG_PIN) - VMIN)/(VMAX - VMIN);
+  if(batper > 100){
+    return 100;
+  }
+  if(batper < 0 ){
+    return 0;
+  }
+  
+  return batper;
 }
 
 
 int nodeIndex(String msg){
   const int num = msg[msg.length()-1] - 48;
-  return num;
+  return (num - 1);
+}
+
+void updateSerial()
+{
+  while (Serial.available()) 
+  {
+    gsmSerial.write(Serial.read());//Forward what Serial received to Software Serial Port
+  }
+  while(gsmSerial.available()) 
+  {
+    Serial.write(gsmSerial.read());//Forward what Software Serial received to Serial Port
+  }
 }
 
 void sendData(){
@@ -194,6 +217,7 @@ void sendData6(){
   taskSendMessage.delay(3000);
 }
 void sendData7(){
+  Serial.println(data[i]);
   gsmSerial.println("AT+HTTPPARA=\"URL\",\"www.sstv-prax.tk:1880/send?"+data[i]+"\"");
   updateSerial();
   taskSendMessage.setCallback(&sendData8);
@@ -202,8 +226,8 @@ void sendData7(){
 void sendData8(){
   gsmSerial.println(F("AT+HTTPPARA=\"CONTENT\",\"application/json\""));
   updateSerial();
-  taskSendMessage.setCallback(&sendData9);
   taskSendMessage.delay(4000);
+  taskSendMessage.setCallback(&sendData9);
 }
 void sendData9(){
   gsmSerial.println(F("AT+HTTPACTION=0"));
@@ -214,5 +238,11 @@ void sendData9(){
 void sendData10(){
   gsmSerial.println(F("AT+HTTPREAD"));
   updateSerial();
-  taskSendMessage.setCallback(&sendData);
+  taskSendMessage.setCallback(&sendData11);
+  taskSendMessage.delay(10000);
+}
+void sendData11(){
+  data[i] = "";
+  i++;
+  taskSendMessage.setCallback(&sendMessage);
 }
